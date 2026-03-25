@@ -1,10 +1,14 @@
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from typing import List
 
 class Settings(BaseSettings):
-    PROJECT_NAME: str = "Code Migration BE"
-    BACKEND_CORS_ORIGINS: list[str] = ["http://localhost:3000", "http://127.0.0.1:3000"]
+    PROJECT_NAME: str = "Code Migration AI"
+    BACKEND_CORS_ORIGINS: List[str] = []
+    
+    # MongoDB Configuration
+    MONGODB_URL: str = ""
+    MONGODB_DB: str = ""
 
-    class Config:
-        case_sensitive = True
+    model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra="ignore")
 
 settings = Settings()
