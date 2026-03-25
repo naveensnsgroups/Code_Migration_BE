@@ -9,6 +9,10 @@ class Settings(BaseSettings):
     MONGODB_URL: str = ""
     MONGODB_DB: str = ""
 
+    # GitHub OAuth
+    GITHUB_CLIENT_ID: str = ""
+    GITHUB_CLIENT_SECRET: str = ""
+
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra="ignore")
 
 settings = Settings()

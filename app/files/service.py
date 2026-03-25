@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 from fastapi import HTTPException
 from typing import List
-from app.schemas.files import FileItem, FileContent
+from .schemas import FileItem, FileContent
 
 # Current project root (e:\CODE_MIGRATION)
 BASE_DIR = Path(__file__).resolve().parent.parent.parent.parent
