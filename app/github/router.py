@@ -14,7 +14,7 @@ async def github_login():
         raise HTTPException(status_code=500, detail="GITHUB_CLIENT_ID not configured.")
     
     scope = "repo,user"
-    url = f"https://github.com/login/oauth/authorize?client_id={settings.GITHUB_CLIENT_ID}&scope={scope}"
+    url = f"https://github.com/login/oauth/authorize?client_id={settings.GITHUB_CLIENT_ID}&scope={scope}&prompt=login"
     return {"url": url}
 
 @router.get("/callback")
