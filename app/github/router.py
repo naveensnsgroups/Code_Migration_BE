@@ -63,3 +63,11 @@ async def clone_selected_repo(request: CloneSelectedRequest):
     """Clone the selected repo using the access token."""
     github_service.clone_repository(request.repo_url, request.access_token)
     return {"status": "success", "message": "Repository cloned successfully."}
+
+@router.post("/cleanup")
+async def cleanup_github_session():
+    """Cleanup local files on logout."""
+    success = github_service.cleanup_on_logout()
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to cleanup local repository files.")
+    return {"status": "success", "message": "Local repository cleaned up successfully."}

@@ -39,4 +39,25 @@ class GitHubService:
                 raise e
             raise HTTPException(status_code=500, detail=str(e))
 
+    @staticmethod
+    def cleanup_on_logout() -> bool:
+        """Deletes the source_code directory on logout, handling read-only git objects."""
+        source_path = SOURCE_DIR.resolve()
+        
+        def remove_readonly(func, path, excinfo):
+            """Error handler for shutil.rmtree to handle read-only files (common in .git)."""
+            import stat
+            os.chmod(path, stat.S_IWRITE)
+            func(path)
+
+        if os.path.exists(source_path):
+            try:
+                shutil.rmtree(source_path, onerror=remove_readonly)
+                print(f"DEBUG: Source code cleanup successful at {source_path}")
+                return True
+            except Exception as e:
+                print(f"ERROR: Failed to cleanup source code: {e}")
+                return False
+        return True
+
 github_service = GitHubService()
