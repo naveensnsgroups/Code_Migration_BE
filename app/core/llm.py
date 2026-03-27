@@ -8,41 +8,61 @@ class GeminiProvider:
         if not settings.GEMINI_API_KEY or settings.GEMINI_API_KEY == "your_key_here":
             print("WARNING: Gemini API Key not set correctly.")
         genai.configure(api_key=settings.GEMINI_API_KEY)
-        self.model = genai.GenerativeModel('gemini-2.5-flash') # Using flash for speed
+        self.model = genai.GenerativeModel('gemini-2.5-flash') # High context, better JSON
+
+    def _clean_json_response(self, text: str):
+        """Robustly extract JSON from AI response, handling markdown blocks and junk text."""
+        if not text:
+            return None
+        
+        text = text.strip()
+        
+        # 1. Try to find JSON inside markdown blocks
+        import re
+        json_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
+        if json_match:
+            text = json_match.group(1)
+        else:
+            # 2. Try to find the first { and last } if no markdown blocks
+            start = text.find('{')
+            end = text.rfind('}')
+            if start != -1 and end != -1:
+                text = text[start:end+1]
+
+        try:
+            return json.loads(text)
+        except Exception as e:
+            print(f"FAILED TO PARSE LLM RESPONSE: {str(e)}")
+            safe_text = str(text)
+            print(f"RAW TEXT START: {safe_text[:200]}...")
+            print(f"RAW TEXT END: {safe_text[-200:]}...")
+            return None
 
     async def analyze_code(self, code: str, filename: str):
         """Perform real-time code analysis using Gemini."""
         prompt = MIGRATION_ANALYSIS_PROMPT.format(filename=filename, code=code)
-        
         try:
             response = self.model.generate_content(prompt)
-            # Remove markdown backticks if present
-            clean_text = response.text.replace('```json', '').replace('```', '').strip()
-            return json.loads(clean_text)
+            data = self._clean_json_response(response.text)
+            return data or {"category": "error", "logic_units": []}
         except Exception as e:
-            print(f"Gemini Analysis Error: {str(e)}")
-            return {
-                "category": "error",
-                "logic_units": [],
-                "error": str(e)
-            }
+            return {"category": "error", "logic_units": [], "error": str(e)}
 
-    async def analyze_project(self, tree: str, samples: dict):
-        """Analyze full project structure and stack."""
-        formatted_samples = "\n\n".join([f"FILE: {path}\n{content}" for path, content in samples.items()])
-        prompt = PROJECT_ANALYSIS_PROMPT.format(tree=tree, samples=formatted_samples)
-        
+    async def analyze_project(self, tree: str, ingested_payload: str):
+        """Analyze full project structure and stack using the Gitingest payload."""
+        prompt = PROJECT_ANALYSIS_PROMPT.format(tree=tree, samples=ingested_payload)
         try:
             response = self.model.generate_content(prompt)
-            clean_text = response.text.replace('```json', '').replace('```', '').strip()
-            return json.loads(clean_text)
-        except Exception as e:
-            print(f"Gemini Project Analysis Error: {str(e)}")
-            return {
-                "stack": {"frontend": "unknown", "backend": "unknown"},
-                "logic_units": [],
-                "error": str(e)
+            data = self._clean_json_response(response.text)
+            return data or {
+                "purpose": "General project analysis",
+                "architecture": "Undefined architecture",
+                "mapped_structure": "Structure mapping failed",
+                "stack": {"frontend": "Unknown", "backend": "Unknown"},
+                "logic_units": []
             }
+        except Exception as e:
+            return {"error": str(e), "logic_units": []}
 
     async def extract_logic_unit(self, unit_name: str, unit_type: str, unit_description: str, context: str):
         """Extract and modernize a specific logic unit."""
@@ -52,17 +72,15 @@ class GeminiProvider:
             unit_description=unit_description,
             context=context
         )
-        
         try:
             response = self.model.generate_content(prompt)
-            clean_text = response.text.replace('```json', '').replace('```', '').strip()
-            return json.loads(clean_text)
-        except Exception as e:
-            print(f"Gemini Extraction Error: {str(e)}")
-            return {
+            data = self._clean_json_response(response.text)
+            return data or {
                 "filename": "ext_error.js",
-                "content": f"// Extraction failed: {str(e)}",
-                "explanation": f"Failed to extract {unit_name} due to AI error."
+                "content": f"// Extraction failed: AI response was not valid JSON",
+                "explanation": "Extraction failed due to parsing error."
             }
+        except Exception as e:
+            return {"error": str(e), "content": "// Extraction failed"}
 
 gemini_provider = GeminiProvider()

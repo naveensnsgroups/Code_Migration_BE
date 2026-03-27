@@ -6,11 +6,16 @@ from app.core.prompts import PROJECT_ANALYSIS_PROMPT
 
 class ProjectAnalysisService:
     async def analyze_full_project(self):
-        """Recursively scan all files and perform a project-level AI analysis."""
+        """Perform a deep Gitingest-style project mapping using master files and tree structure."""
         project_tree = self._get_project_tree(SOURCE_DIR)
-        key_files_content = self._get_important_files_content(SOURCE_DIR)
+        deep_context = self._get_important_files_content(SOURCE_DIR)
         
-        analysis = await gemini_provider.analyze_project(project_tree, key_files_content)
+        # Construct the 'God-eye view' context string
+        ingested_payload = f"FULL PROJECT TREE:\n{project_tree}\n\nCORE CONFIGURATION & ENTRY POINTS:\n"
+        for path, content in deep_context.items():
+            ingested_payload += f"--- START FILE: {path} ---\n{content}\n--- END FILE: {path} ---\n\n"
+            
+        analysis = await gemini_provider.analyze_project(project_tree, ingested_payload)
         return analysis
 
     def _get_project_tree(self, directory: Path) -> str:
@@ -30,21 +35,50 @@ class ProjectAnalysisService:
         return "\n".join(tree_lines)
 
     def _get_important_files_content(self, directory: Path) -> dict:
-        important_exts = {'.html', '.js', '.py', '.json', '.ts', '.tsx'}
+        """Surgically select structural 'Master Files' for deep context."""
+        master_files = {
+            'package.json', 'composer.json', 'requirements.txt', 'setup.py', 'pyproject.toml',
+            'index.html', 'index.php', 'index.js', 'main.py', 'app.js', 'app.py',
+            'tsconfig.json', 'tailwind.config.js', 'webpack.config.js', 'vite.config.ts',
+            'Dockerfile', 'docker-compose.yml', '.env.example'
+        }
         contents = {}
         
-        file_count = 0
+        # 1. Grab all master files regardless of count (prioritizing architecture)
         for root, _, files in os.walk(directory):
+            # Skip noise
+            if any(part in root for part in ['node_modules', 'vendor', '.git']):
+                continue
+                
             for f in files:
-                if any(f.endswith(ext) for ext in important_exts) and file_count < 15:
+                if f in master_files:
                     path = Path(root) / f
                     rel_path = path.relative_to(directory)
                     try:
+                        # Full content for master files (up to 10k chars)
                         text = path.read_text(encoding='utf-8')
-                        contents[str(rel_path)] = text[:3000] # Increased limit
-                        file_count += 1
+                        contents[str(rel_path)] = text[:10000]
                     except Exception:
                         continue
+        
+        # 2. Add samples of core logic files if we have room
+        logic_exts = {'.js', '.py', '.php', '.ts', '.tsx'}
+        file_count = len(contents)
+        if file_count < 25:
+            for root, _, files in os.walk(directory):
+                if any(part in root for part in ['node_modules', 'vendor', '.git']):
+                    continue
+                for f in files:
+                    if any(f.endswith(ext) for ext in logic_exts) and f not in contents and file_count < 25:
+                        path = Path(root) / f
+                        rel_path = path.relative_to(directory)
+                        try:
+                            text = path.read_text(encoding='utf-8')
+                            contents[str(rel_path)] = text[:3000]
+                            file_count += 1
+                        except Exception:
+                            continue
+                            
         return contents
 
     async def migrate_logic_unit(self, unit_id: str, unit_name: str, unit_type: str, unit_description: str):

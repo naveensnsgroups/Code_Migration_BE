@@ -32,34 +32,45 @@ GUIDELINES:
 
 PROJECT_ANALYSIS_PROMPT = """
 You are Antigravity AI, a master software architect. 
-Analyze the following project structure and key file contents to identify the tech stack and major business modules.
+Analyze the following deep project ingestion (Gitingest Pattern) and provide a Project Intelligence Blueprint.
 
-PROJECT STRUCTURE:
+PROJECT STRUCTURE (FILE TREE):
 {tree}
 
-KEY FILE SAMPLES:
+MASTER CONFIGURATION & SAMPLES:
 {samples}
 
 OUTPUT:
-Return a valid JSON object:
+You must return a valid JSON object. 
+IMPORTANT: DO NOT provide 'unknown' for the stack. Infer the most likely tech stack from the files and configurations provided.
+IMPORTANT: You MUST identify at least 8-10 'logic_units' representing critical business features, UI components, or API endpoints. Be exhaustive.
+
+Structure:
 {{
+  "purpose": "Detailed description of the application's core functionality and business goal.",
+  "architecture": "Specific architectural pattern (e.g., 'PHP Monolith', 'Full-stack React/Node.js').",
+  "mapped_structure": "A detailed, annotated architectural map. Use indentations for folders. Explain the purpose of each directory.",
   "stack": {{
-    "frontend": "e.g. React/Vanilla JS",
-    "backend": "e_g. PHP/Node/Python",
-    "database": "e_g. MySQL/MongoDB"
+    "frontend": "Confirmed stack name",
+    "backend": "Confirmed stack name",
+    "database": "Confirmed stack name"
+  }},
+  "blueprint": {{
+    "core_logic": "Deep dive into data/logic flow.",
+    "hotspots": ["List of critical files/paths"]
   }},
   "logic_units": [
     {{
-      "id": "global_id",
-      "name": "Global Feature Name",
+      "id": "u1",
+      "name": "Feature Name",
       "type": "ui_component" | "api_logic" | "business_rule",
-      "priority": "high" | "medium" | "low",
-      "description": "How this feature works across the project."
+      "priority": "high",
+      "description": "Exhaustive detail on logic, location, and purpose."
     }}
   ]
 }}
 
-Return ONLY raw JSON.
+Return ONLY the raw JSON object. No markdown, no pre-amble, no post-amble.
 """
 
 MIGRATION_EXTRACTION_PROMPT = """
